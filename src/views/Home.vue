@@ -21,8 +21,13 @@
     </b-container>
     <b-container>
       <b-row class="justify-content-md-center">
-        <b-col col lg="10">
-          <b-table striped hover :items="items"></b-table>
+        <b-col col lg="11">
+          <b-table :items="items" :fields="fields" striped responsive="sm">
+            <template v-slot:cell(status_details)="row">
+                <b-button v-if="row.detailsShowing" variant="danger" @click="openmodal(row.item.id,row.item.status,row.item.name)" class="mr-2">Desactivar</b-button>
+                <b-button v-if="!row.detailsShowing" variant="primary" @click="openmodal(row.item.id,row.item.status,row.item.name)" class="mr-2">Activar</b-button>
+            </template>
+          </b-table>
         </b-col>
       </b-row>
     </b-container>
@@ -53,6 +58,20 @@
           </b-pagination>
         </b-col>
 	    </b-row>
+      <div>
+        <b-modal id="change-status" centered hide-footer>
+            <template v-slot:modal-title>
+                Cambiar el estado del Usuario
+            </template>
+            <div class="d-block text-center">
+                <h5 v-if="state">¿Desea  Desactivar la cuenta del Usuario {{user}}?</h5>
+                <h5 v-if="!state">¿Desea Activar la cuenta del Usuario {{user}}?</h5>
+            </div>
+            <b-button v-if="state" variant="danger" @click="changestatus()" class="mr-2">Desactivar</b-button>
+            <b-button v-if="!state" variant="primary" @click="changestatus()" class="mr-2">Activar</b-button>
+
+        </b-modal>
+      </div>
 	  </b-container>
   </div>
 </template>
@@ -62,6 +81,7 @@
   export default {
     data() {
       return {
+        fields: ['id','status','name', 'email','created_at','updated_at','status_details'],
         items: [
           
         ],
@@ -70,7 +90,7 @@
         options: [
           { value: null, text: 'Selecciona una opción' },
           { value: '1', text: 'Activos' },
-          { value: '0', text: 'Desactivos' }
+          { value: '0', text: 'Inactivo' }
         ],
         errors:[],
         rows: 1,
@@ -81,13 +101,17 @@
         prev:'',
         next:'',
         page_url:'/user/all',
-		    number_page:'/user/all?page=',
+        number_page:'/user/all?page=',
+        id:1,
+        state:1,
+        user:'Demo'
       }
     },
     methods:{
         filter(){
           axios.get(`/user/search/${this.text}`).then((response)=>{
-            this.number_page = `/user/search/${this.text}?page=`;
+            this.page_url = `/user/search/${this.text}`;
+            this.number_page = `${this.page_url}?page=`;
             this.parsePagination(response);
           }).catch((error)=>{
             console.log(error);
@@ -111,13 +135,17 @@
         changstate(state){
           axios.get(`/user/status/${state}`)
           .then((response)=>{
-            this.number_page = `/user/status/${state}?page=`;
+            this.page_url = `/user/status/${state}`;
+            this.number_page = `${this.page_url}?page=`;
             this.parsePagination(response);
           }).catch((error)=>{
             console.log(error)
           });
         },
         parsePagination(response){
+          for(let i in response.data.data){
+            response.data.data[i]['_showDetails'] = response.data.data[i]["status"] ? true : false;
+          }
           this.rows = response.data.total;
           this.perPage = response.data.per_page;
           this.currentPage = response.data.current_page;
@@ -133,6 +161,21 @@
           this.selected=null;
           this.text="";
           this.listUsers();
+        },
+        openmodal(id,state,user){
+            this.$bvModal.show('change-status');
+            this.id =id;
+            this.state = state;
+            this.user = user;
+        },
+        changestatus(){
+          this.$bvModal.hide('change-status');
+          this.state = this.state ? 0 : 1;
+          axios.get(`/user/changestate/${this.id}/${this.state}`)
+          .then(()=>this.listUsers())
+          .catch((error)=>{
+              console.log(error);
+          })
         }
     },
     created(){
